@@ -1,0 +1,1069 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HerSignal Analytics Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --teal: #0d4a4a; --teal-mid: #0f5c5c; --teal-light: #1a7a7a;
+      --plum: #4a1a6b; --plum-light: #6b2d99;
+      --gradient: linear-gradient(135deg, #0d4a4a 0%, #2d1a5c 50%, #4a1a6b 100%);
+      --warm-white: #faf9f7; --stable: #16a34a; --monitor: #d97706; --escalate: #dc2626;
+      --card-bg: #ffffff; --border: #e8e4f0; --text-primary: #1a1a2e;
+      --text-secondary: #5a5a7a; --text-muted: #9090a8;
+      --shadow-sm: 0 1px 3px rgba(13,74,74,.07), 0 1px 2px rgba(74,26,107,.05);
+      --radius: 14px; --radius-sm: 8px;
+    }
+    body { font-family: 'Inter', sans-serif; background: var(--warm-white); color: var(--text-primary); min-height: 100vh; line-height: 1.5; }
+    .header { background: var(--gradient); color: #fff; padding: 2rem 1.5rem 2.5rem; position: relative; overflow: hidden; }
+    .header::before { content: ''; position: absolute; top: -60px; right: -60px; width: 220px; height: 220px; border-radius: 50%; background: rgba(255,255,255,.05); pointer-events: none; }
+    .header::after { content: ''; position: absolute; bottom: -80px; left: 30%; width: 300px; height: 300px; border-radius: 50%; background: rgba(255,255,255,.04); pointer-events: none; }
+    .header-inner { max-width: 1200px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 1rem; position: relative; z-index: 1; }
+    .header-brand { display: flex; align-items: center; gap: .75rem; margin-bottom: .5rem; }
+    .header-logo { width: 42px; height: 42px; background: rgba(255,255,255,.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,.2); }
+    .header-wordmark { font-size: 1.1rem; font-weight: 700; letter-spacing: .02em; opacity: .95; }
+    .header-title { font-size: clamp(1.5rem, 4vw, 2rem); font-weight: 800; letter-spacing: -.02em; line-height: 1.2; }
+    .header-subtitle { font-size: .875rem; opacity: .75; margin-top: .3rem; }
+    .header-actions { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+    .badge-total { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25); border-radius: 999px; padding: .35rem .9rem; font-size: .85rem; font-weight: 600; backdrop-filter: blur(4px); display: flex; align-items: center; gap: .4rem; }
+    .badge-total .dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+    .btn-refresh { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3); color: #fff; border-radius: var(--radius-sm); padding: .5rem 1.1rem; font-family: inherit; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .2s, transform .15s; display: flex; align-items: center; gap: .4rem; backdrop-filter: blur(4px); }
+    .btn-refresh:hover { background: rgba(255,255,255,.25); transform: translateY(-1px); }
+    .btn-refresh.spinning svg { animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .main { max-width: 1200px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+    .state-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 340px; gap: 1rem; text-align: center; }
+    .state-icon { font-size: 3rem; }
+    .state-title { font-size: 1.25rem; font-weight: 700; }
+    .state-msg { font-size: .9rem; color: var(--text-secondary); max-width: 380px; }
+    .btn-retry { background: var(--gradient); color: #fff; border: none; border-radius: var(--radius-sm); padding: .6rem 1.4rem; font-family: inherit; font-size: .875rem; font-weight: 600; cursor: pointer; margin-top: .5rem; }
+    .spinner { width: 44px; height: 44px; border: 3px solid var(--border); border-top-color: var(--teal-light); border-radius: 50%; animation: spin .8s linear infinite; }
+    #dashboard { display: none; }
+    #dashboard.visible { display: block; }
+    .section-label { font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: .75rem; }
+    .filter-bar { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: .9rem 1.25rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm); }
+    .filter-label { font-size: .78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .07em; white-space: nowrap; }
+    .filter-select { font-family: inherit; font-size: .875rem; font-weight: 500; color: var(--text-primary); background: var(--warm-white); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .4rem .9rem; cursor: pointer; outline: none; min-width: 200px; }
+    .filter-select:focus { border-color: var(--teal-light); }
+    .filter-count { font-size: .8rem; color: var(--text-muted); margin-left: auto; }
+    .metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    @media (max-width: 800px) { .metrics-row { grid-template-columns: repeat(2, 1fr); } }
+    .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem 1.25rem 1rem; box-shadow: var(--shadow-sm); position: relative; overflow: hidden; }
+    .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--gradient); border-radius: var(--radius) var(--radius) 0 0; }
+    .stat-card .stat-icon { font-size: 1.4rem; margin-bottom: .5rem; }
+    .stat-card .stat-value { font-size: 2rem; font-weight: 800; letter-spacing: -.03em; color: var(--teal); line-height: 1; }
+    .stat-card .stat-label { font-size: .78rem; font-weight: 600; color: var(--text-secondary); margin-top: .35rem; text-transform: uppercase; letter-spacing: .05em; }
+    .stat-card .stat-sub { font-size: .75rem; color: var(--text-muted); margin-top: .2rem; }
+    .charts-row { display: grid; grid-template-columns: 1fr 2fr; gap: 1rem; margin-bottom: 1.5rem; }
+    @media (max-width: 760px) { .charts-row { grid-template-columns: 1fr; } }
+    .panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.4rem 1.4rem 1.2rem; box-shadow: var(--shadow-sm); }
+    .panel-full { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.4rem 1.4rem 1.2rem; box-shadow: var(--shadow-sm); margin-bottom: 1.5rem; }
+    .panel-title { font-size: .95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 1rem; display: flex; align-items: center; gap: .5rem; }
+    .donut-wrap { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+    .donut-canvas-wrap { position: relative; width: 180px; height: 180px; }
+    .donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+    .donut-center-val { font-size: 1.6rem; font-weight: 800; color: var(--teal); line-height: 1; }
+    .donut-center-lbl { font-size: .65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; margin-top: .15rem; }
+    .donut-legend { width: 100%; display: flex; flex-direction: column; gap: .5rem; }
+    .legend-item { display: flex; align-items: center; justify-content: space-between; font-size: .82rem; }
+    .legend-left { display: flex; align-items: center; gap: .5rem; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .legend-name { color: var(--text-secondary); font-weight: 500; }
+    .legend-pct { font-weight: 700; color: var(--text-primary); }
+    .legend-count { font-size: .75rem; color: var(--text-muted); margin-left: .25rem; }
+    .chart-canvas-wrap { position: relative; width: 100%; }
+    .chart-canvas-wrap canvas { width: 100% !important; }
+    .history-scroll { overflow-x: auto; padding-bottom: .5rem; }
+    .history-track { display: flex; align-items: flex-end; gap: .6rem; min-width: max-content; padding: .5rem .25rem 0; }
+    .history-item { display: flex; flex-direction: column; align-items: center; gap: .4rem; }
+    .history-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(0,0,0,.08); flex-shrink: 0; transition: transform .15s; cursor: default; }
+    .history-dot:hover { transform: scale(1.3); }
+    .history-dot.stable { background: var(--stable); }
+    .history-dot.monitor { background: var(--monitor); }
+    .history-dot.escalate { background: var(--escalate); }
+    .history-date { font-size: .62rem; color: var(--text-muted); writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; max-height: 52px; }
+    .history-legend { display: flex; gap: 1.2rem; margin-top: 1rem; flex-wrap: wrap; }
+    .hl-item { display: flex; align-items: center; gap: .4rem; font-size: .78rem; color: var(--text-secondary); }
+    .hl-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .notes-table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+    thead th { text-align: left; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); padding: .5rem .75rem .75rem; border-bottom: 1px solid var(--border); }
+    tbody tr { border-bottom: 1px solid #f0edf8; transition: background .15s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #faf8ff; }
+    tbody td { padding: .75rem; vertical-align: top; }
+    .td-date { white-space: nowrap; color: var(--text-secondary); font-size: .8rem; font-weight: 500; }
+    .signal-badge { display: inline-flex; align-items: center; gap: .3rem; border-radius: 999px; padding: .2rem .65rem; font-size: .72rem; font-weight: 700; text-transform: capitalize; white-space: nowrap; }
+    .signal-badge.stable { background: #dcfce7; color: #15803d; }
+    .signal-badge.monitor { background: #fef3c7; color: #b45309; }
+    .signal-badge.escalate { background: #fee2e2; color: #b91c1c; }
+    .signal-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
+    .signal-badge.stable::before { background: var(--stable); }
+    .signal-badge.monitor::before { background: var(--monitor); }
+    .signal-badge.escalate::before { background: var(--escalate); }
+    .td-notes { color: var(--text-secondary); font-size: .83rem; line-height: 1.5; max-width: 480px; }
+    .no-notes { text-align: center; padding: 2.5rem 1rem; color: var(--text-muted); font-size: .875rem; }
+    /* ── Strategic Intelligence ── */
+    .exec-summary { background: var(--gradient); color: #fff; border-radius: var(--radius); padding: 1.5rem 1.75rem; margin-bottom: 1.5rem; position: relative; overflow: hidden; }
+    .exec-summary::after { content: ''; position: absolute; right: -40px; top: -40px; width: 180px; height: 180px; border-radius: 50%; background: rgba(255,255,255,.04); pointer-events: none; }
+    .exec-summary-label { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; opacity: .6; margin-bottom: .4rem; }
+    .exec-summary-text { font-size: .95rem; line-height: 1.65; opacity: .92; position: relative; z-index: 1; }
+    .exec-badges { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .9rem; }
+    .exec-badge { background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.22); border-radius: 999px; padding: .25rem .75rem; font-size: .72rem; font-weight: 600; }
+    .intel-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    @media (max-width: 900px) { .intel-grid { grid-template-columns: 1fr; } }
+    .intel-card { border-radius: var(--radius); padding: 1.4rem; border: 1px solid transparent; color: #fff; }
+    .intel-card.pharma { background: linear-gradient(135deg, #0d1f4a 0%, #1a2d6b 100%); border-color: #2d3f8a; }
+    .intel-card.benefits { background: linear-gradient(135deg, #1a3a1a 0%, #2d5c2d 100%); border-color: #3a7a3a; }
+    .intel-card.data-asset { background: linear-gradient(135deg, #3a1a4a 0%, #5c2d6b 100%); border-color: #7a3a9a; }
+    .intel-card-icon { font-size: 1.8rem; margin-bottom: .75rem; }
+    .intel-card-title { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; opacity: .65; margin-bottom: .2rem; }
+    .intel-card-heading { font-size: 1rem; font-weight: 800; margin-bottom: .9rem; line-height: 1.3; }
+    .intel-grade { display: inline-flex; align-items: center; gap: .5rem; background: rgba(255,255,255,.15); border-radius: 999px; padding: .3rem .9rem; font-size: .8rem; font-weight: 700; margin-bottom: 1rem; border: 1px solid rgba(255,255,255,.2); }
+    .grade-val { font-size: 1.1rem; font-weight: 800; }
+    .intel-rows { display: flex; flex-direction: column; gap: .55rem; }
+    .intel-row { display: flex; align-items: flex-start; gap: .6rem; font-size: .79rem; opacity: .9; line-height: 1.4; }
+    .intel-row-icon { flex-shrink: 0; font-size: .85rem; margin-top: .05rem; }
+    .intel-row strong { font-weight: 700; opacity: 1; }
+    .intel-divider { height: 1px; background: rgba(255,255,255,.12); margin: .9rem 0; }
+    .intel-tag { display: inline-block; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); border-radius: 4px; padding: .15rem .5rem; font-size: .67rem; font-weight: 600; margin: .15rem .15rem 0 0; letter-spacing: .03em; }
+    /* ── Partnership Readiness Checklist ── */
+    .checklist-section { margin-bottom: 1.5rem; }
+    .checklist-tabs { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .ctab { background: var(--card-bg); border: 1px solid var(--border); border-radius: 999px; padding: .4rem 1rem; font-family: inherit; font-size: .8rem; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: all .2s; }
+    .ctab:hover { border-color: var(--teal-light); color: var(--teal); }
+    .ctab.active { background: var(--gradient); color: #fff; border-color: transparent; }
+    .checklist-panel { display: none; }
+    .checklist-panel.active { display: block; }
+    .checklist-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow-sm); }
+    .checklist-intro { font-size: .875rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.6; }
+    .checklist-intro strong { color: var(--text-primary); }
+    .milestone-group { margin-bottom: 1.5rem; }
+    .milestone-group:last-child { margin-bottom: 0; }
+    .milestone-group-title { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); margin-bottom: .75rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
+    .milestone-item { display: flex; align-items: flex-start; gap: .9rem; padding: .7rem 0; border-bottom: 1px solid #f5f3fb; }
+    .milestone-item:last-child { border-bottom: none; }
+    .milestone-status { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .75rem; font-weight: 700; margin-top: .1rem; }
+    .milestone-status.done { background: #dcfce7; color: #15803d; }
+    .milestone-status.active { background: #fef3c7; color: #b45309; }
+    .milestone-status.locked { background: #f1f0f8; color: var(--text-muted); }
+    .milestone-body { flex: 1; }
+    .milestone-title { font-size: .875rem; font-weight: 700; color: var(--text-primary); margin-bottom: .2rem; }
+    .milestone-title.locked { color: var(--text-muted); }
+    .milestone-desc { font-size: .8rem; color: var(--text-secondary); line-height: 1.5; }
+    .milestone-metric { display: inline-block; background: #f0edf8; color: var(--plum); border-radius: 4px; padding: .1rem .45rem; font-size: .7rem; font-weight: 700; margin-top: .3rem; }
+    .milestone-metric.met { background: #dcfce7; color: #15803d; }
+    .milestone-metric.unmet { background: #fee2e2; color: #b91c1c; }
+    .progress-bar-wrap { margin-bottom: 1.25rem; }
+    .progress-bar-label { display: flex; justify-content: space-between; font-size: .78rem; font-weight: 600; color: var(--text-secondary); margin-bottom: .4rem; }
+    .progress-bar-track { height: 8px; background: #f0edf8; border-radius: 999px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: var(--gradient); border-radius: 999px; transition: width .6s ease; }
+    .unlock-banner { background: linear-gradient(135deg, #fef3c7, #fde68a); border: 1px solid #f59e0b; border-radius: var(--radius-sm); padding: .75rem 1rem; font-size: .82rem; color: #92400e; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: .5rem; }
+    /* Footer */
+    .footer { background: var(--teal); color: rgba(255,255,255,.65); text-align: center; padding: 1.25rem 1rem; font-size: .8rem; }
+    .footer a { color: rgba(255,255,255,.85); text-decoration: none; font-weight: 600; margin-right: 1.5rem; }
+    .footer-row { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .5rem 1.5rem; }
+  </style>
+</head>
+<body>
+
+
+<header class="header">
+  <div class="header-inner">
+    <div>
+      <div class="header-brand">
+        <div class="header-logo">🌿</div>
+        <span class="header-wordmark">HerSignal</span>
+      </div>
+      <h1 class="header-title">Analytics Dashboard</h1>
+      <p class="header-subtitle">Live data · RWE Intelligence · Partnership Readiness</p>
+    </div>
+    <div class="header-actions">
+      <div class="badge-total" id="totalBadge" style="display:none;">
+        <span class="dot"></span>
+        <span id="totalBadgeCount">0</span> check-ins
+      </div>
+      <button class="btn-refresh" id="btnRefresh" onclick="loadData()">
+        <svg id="refreshIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+        Refresh
+      </button>
+    </div>
+  </div>
+</header>
+
+
+<main class="main">
+  <div id="stateLoading" class="state-screen">
+    <div class="spinner"></div>
+    <p class="state-title">Loading analytics…</p>
+    <p class="state-msg">Fetching live data from Supabase</p>
+  </div>
+  <div id="stateError" class="state-screen" style="display:none;">
+    <div class="state-icon">⚠️</div>
+    <p class="state-title">Unable to load data</p>
+    <p class="state-msg" id="errorMsg">Could not connect to Supabase.</p>
+    <button class="btn-retry" onclick="loadData()">Try Again</button>
+  </div>
+  <div id="stateEmpty" class="state-screen" style="display:none;">
+    <div class="state-icon">📋</div>
+    <p class="state-title">No check-ins yet</p>
+    <p class="state-msg">Once users complete check-ins, data will appear here.</p>
+  </div>
+
+
+  <div id="dashboard">
+
+
+    <!-- User Filter -->
+    <div class="filter-bar" id="filterBar" style="display:none;">
+      <span class="filter-label">👤 Filter by User</span>
+      <select class="filter-select" id="userFilter" onchange="applyFilter()">
+        <option value="all">All Users</option>
+      </select>
+      <span class="filter-count" id="filterCount"></span>
+    </div>
+
+
+    <!-- Key Metrics -->
+    <p class="section-label">Key Metrics</p>
+    <div class="metrics-row">
+      <div class="stat-card">
+        <div class="stat-icon">📊</div>
+        <div class="stat-value" id="mTotal">—</div>
+        <div class="stat-label">Total Check-Ins</div>
+        <div class="stat-sub">All time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🌡️</div>
+        <div class="stat-value" id="mIntensity">—</div>
+        <div class="stat-label">Avg Intensity</div>
+        <div class="stat-sub">Scale 1–5</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🔮</div>
+        <div class="stat-value" id="mClarity">—</div>
+        <div class="stat-label">Avg Clarity</div>
+        <div class="stat-sub">Scale 1–10</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">💫</div>
+        <div class="stat-value" id="mStress">—</div>
+        <div class="stat-label">Avg Stress</div>
+        <div class="stat-sub">Scale 1–5</div>
+      </div>
+    </div>
+
+
+    <!-- Charts -->
+    <div class="charts-row">
+      <div class="panel">
+        <div class="panel-title">🎯 Signal Distribution</div>
+        <div class="donut-wrap">
+          <div class="donut-canvas-wrap">
+            <canvas id="chartDonut" width="180" height="180"></canvas>
+            <div class="donut-center">
+              <span class="donut-center-val" id="donutTotal">0</span>
+              <span class="donut-center-lbl">total</span>
+            </div>
+          </div>
+          <div class="donut-legend" id="donutLegend"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">📈 Weekly Trend</div>
+        <div class="chart-canvas-wrap" style="height:240px;">
+          <canvas id="chartLine"></canvas>
+        </div>
+      </div>
+    </div>
+
+
+    <div class="panel-full">
+      <div class="panel-title">🩺 Symptom Frequency <span style="font-size:.72rem;font-weight:400;color:var(--escalate);margin-left:.5rem;">■ High Risk</span><span style="font-size:.72rem;font-weight:400;color:var(--teal-light);margin-left:.75rem;">■ Standard</span></div>
+      <div class="chart-canvas-wrap" id="barWrap"><canvas id="chartBar"></canvas></div>
+    </div>
+
+
+    <div class="panel-full">
+      <div class="panel-title">🕐 Recent Signal History <span style="font-size:.75rem;font-weight:400;color:var(--text-muted);margin-left:.5rem;">Last 20 · most recent →</span></div>
+      <div class="history-scroll"><div class="history-track" id="historyTrack"></div></div>
+      <div class="history-legend">
+        <div class="hl-item"><div class="hl-dot" style="background:var(--stable)"></div>Stable</div>
+        <div class="hl-item"><div class="hl-dot" style="background:var(--monitor)"></div>Monitor</div>
+        <div class="hl-item"><div class="hl-dot" style="background:var(--escalate)"></div>Escalate</div>
+      </div>
+    </div>
+
+
+    <!-- ── STRATEGIC INTELLIGENCE ── -->
+    <p class="section-label">Strategic Intelligence · Commercial Readiness</p>
+
+
+    <div class="exec-summary">
+      <div class="exec-summary-label">Overall Assessment</div>
+      <div class="exec-summary-text" id="execText">Loading assessment…</div>
+      <div class="exec-badges" id="execBadges"></div>
+    </div>
+
+
+    <div class="intel-grid">
+      <div class="intel-card pharma">
+        <div class="intel-card-icon">🔬</div>
+        <div class="intel-card-title">Real-World Evidence</div>
+        <div class="intel-card-heading">Pharma / Life Sciences Readiness</div>
+        <div class="intel-grade"><span class="grade-val" id="rweGrade">—</span><span id="rweGradeLabel">Calculating…</span></div>
+        <div class="intel-rows" id="rweRows"></div>
+        <div class="intel-divider"></div>
+        <div id="rweTags"></div>
+      </div>
+      <div class="intel-card benefits">
+        <div class="intel-card-icon">🏢</div>
+        <div class="intel-card-title">Employee Benefits Analytics</div>
+        <div class="intel-card-heading">Workforce Health Risk Intelligence</div>
+        <div class="intel-grade"><span class="grade-val" id="benefitsGrade">—</span><span id="benefitsGradeLabel">Calculating…</span></div>
+        <div class="intel-rows" id="benefitsRows"></div>
+        <div class="intel-divider"></div>
+        <div id="benefitsTags"></div>
+      </div>
+      <div class="intel-card data-asset">
+        <div class="intel-card-icon">📦</div>
+        <div class="intel-card-title">Proprietary Data Asset</div>
+        <div class="intel-card-heading">Longitudinal Symptom Dataset Value</div>
+        <div class="intel-grade"><span class="grade-val" id="dataGrade">—</span><span id="dataGradeLabel">Calculating…</span></div>
+        <div class="intel-rows" id="dataRows"></div>
+        <div class="intel-divider"></div>
+        <div id="dataTags"></div>
+      </div>
+    </div>
+
+
+    <!-- ── PARTNERSHIP READINESS CHECKLIST ── -->
+    <p class="section-label">Partnership Readiness Checklist</p>
+    <div class="checklist-section">
+      <div class="checklist-tabs">
+        <button class="ctab active" onclick="switchTab('pharma-tab', this)">🔬 RWE / Pharma</button>
+        <button class="ctab" onclick="switchTab('benefits-tab', this)">🏢 Employee Benefits</button>
+        <button class="ctab" onclick="switchTab('data-tab', this)">📦 Data Licensing</button>
+        <button class="ctab" onclick="switchTab('clinical-tab', this)">🏥 Clinical / Health System</button>
+      </div>
+
+
+      <!-- Pharma Tab -->
+      <div class="checklist-panel active" id="pharma-tab">
+        <div class="checklist-card">
+          <div class="checklist-intro">
+            <strong>Target partners:</strong> Astellas (Veozah), Bayer Women's Health, Organon, Pfizer Menopause Portfolio, Featurespace CROs.<br>
+            <strong>What they buy:</strong> De-identified longitudinal PRO datasets for label expansion, post-market surveillance, and real-world comparative effectiveness studies.
+          </div>
+          <div class="progress-bar-wrap" id="pharmaProgressWrap">
+            <div class="progress-bar-label"><span>Pharma Readiness</span><span id="pharmaProgressPct">0%</span></div>
+            <div class="progress-bar-track"><div class="progress-bar-fill" id="pharmaProgressFill" style="width:0%"></div></div>
+          </div>
+          <div id="pharmaBanner"></div>
+          <div class="milestone-group">
+            <div class="milestone-group-title">Phase 1 — Data Foundation</div>
+            <div class="milestone-item">
+              <div class="milestone-status" id="ps1">?</div>
+              <div class="milestone-body">
+                <div class="milestone-title" id="ps1t">10+ Unique Users</div>
+                <div class="milestone-desc">Minimum viable cohort for initial pharma data conversations. Below this, no partner will engage.</div>
+                <span class="milestone-metric" id="ps1m">Checking…</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status" id="ps2">?</div>
+              <div class="milestone-body">
+                <div class="milestone-title" id="ps2t">4+ Weeks Longitudinal Depth</div>
+                <div class="milestone-desc">Minimum time span to demonstrate repeat engagement and trend validity.</div>
+                <span class="milestone-metric" id="ps2m">Checking…</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status" id="ps3">?</div>
+              <div class="milestone-body">
+                <div class="milestone-title" id="ps3t">6+ Symptom Types Captured</div>
+                <div class="milestone-desc">Phenotypic diversity is a key value driver. Narrow symptom sets have limited RWE utility.</div>
+                <span class="milestone-metric" id="ps3m">Checking…</span>
+              </div>
+            </div>
+          </div>
+          <div class="milestone-group">
+            <div class="milestone-group-title">Phase 2 — Partnership Conversations</div>
+            <div class="milestone-item">
+              <div class="milestone-status locked" id="ps4">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">50+ Unique Users</div>
+                <div class="milestone-desc">Threshold for Astellas, Bayer, and Organon initial data partnership discussions. Required for NDA/data sharing agreement conversations.</div>
+                <span class="milestone-metric unmet" id="ps4m">Target: 50 users</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">12+ Weeks Longitudinal Span</div>
+                <div class="milestone-desc">Quarterly trend data is the minimum for FDA RWE guidance alignment and CRO interest.</div>
+                <span class="milestone-metric unmet">Target: 12 weeks</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">HIPAA De-Identification Completed</div>
+                <div class="milestone-desc">Safe Harbor or Expert Determination method required before any data can be shared with pharma partners.</div>
+                <span class="milestone-metric unmet">Action required</span>
+              </div>
+            </div>
+          </div>
+          <div class="milestone-group">
+            <div class="milestone-group-title">Phase 3 — Commercial Data Deal</div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">200+ Unique Users · 52-Week Span</div>
+                <div class="milestone-desc">Full RWE-grade cohort. Enables licensing deals at $100–250/record range. Sufficient for FDA RWE submission support.</div>
+                <span class="milestone-metric unmet">Target: 200 users, 52 weeks</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">OMOP CDM Mapping</div>
+                <div class="milestone-desc">Convert dataset to OMOP Common Data Model. Required for CRO integration and health system network participation (TriNetX, PCORnet).</div>
+                <span class="milestone-metric unmet">Unlocks at 200 users</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">IRB Protocol or Exemption Letter</div>
+                <div class="milestone-desc">Non-interventional observational study protocol. Required for academic pharma partnerships and publication-grade RWE.</div>
+                <span class="milestone-metric unmet">Action required</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- Benefits Tab -->
+      <div class="checklist-panel" id="benefits-tab">
+        <div class="checklist-card">
+          <div class="checklist-intro">
+            <strong>Target partners:</strong> Carrot Fertility, Maven Clinic, Progyny, Optum, large self-insured employers (Fortune 500 HR/Benefits teams), PBMs.<br>
+            <strong>What they buy:</strong> Workforce health risk analytics, menopause benefit program justification data, EAP integration triggers, and absenteeism/presenteeism quantification.
+          </div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-label"><span>Benefits Readiness</span><span id="benefitsProgressPct">0%</span></div>
+            <div class="progress-bar-track"><div class="progress-bar-fill" id="benefitsProgressFill" style="width:0%"></div></div>
+          </div>
+          <div class="milestone-group">
+            <div class="milestone-group-title">Phase 1 — Proof of Concept</div>
+            <div class="milestone-item">
+              <div class="milestone-status" id="bs1">?</div>
+              <div class="milestone-body">
+                <div class="milestone-title">20+ Check-Ins with Clarity + Stress Data</div>
+                <div class="milestone-desc">Minimum dataset to calculate a Cognitive Presenteeism Index meaningful to a benefits director.</div>
+                <span class="milestone-metric" id="bs1m">Checking…</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status" id="bs2">?</div>
+              <div class="milestone-body">
+                <div class="milestone-title">Escalate Rate Calculable</div>
+                <div class="milestone-desc">Any escalate signal in the dataset enables EAP threshold framing — even 1 escalation is a story for benefits buyers.</div>
+                <span class="milestone-metric" id="bs2m">Checking…</span>
+              </div>
+            </div>
+          </div>
+          <div class="milestone-group">
+            <div class="milestone-group-title">Phase 2 — Employer Pilot Pitch</div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">50+ Users from Identifiable Employer Group</div>
+                <div class="milestone-desc">A single-employer cohort (even anonymized) is the gold standard for benefits analytics. Enables "your workforce" framing vs. general population data.</div>
+                <span class="milestone-metric unmet">Target: 50 users, 1 employer</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">Absenteeism Proxy Data (Days Impacted)</div>
+                <div class="milestone-desc">Add a "days affected" field to check-ins. This single data point unlocks CFO-level ROI calculations ($4,000–$7,000/employee/year benchmark).</div>
+                <span class="milestone-metric unmet">Feature addition required</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">SHRM Menopause Benefits Framework Alignment Doc</div>
+                <div class="milestone-desc">A 1-page mapping of HerSignal metrics to SHRM's published menopause benefits framework. Required for HR director conversations.</div>
+                <span class="milestone-metric unmet">Document required</span>
+              </div>
+            </div>
+          </div>
+          <div class="milestone-group">
+            <div class="milestone-group-title">Phase 3 — Commercial Benefits Contract</div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">Integration with Carrot / Maven / Progyny API</div>
+                <div class="milestone-desc">Embedding HerSignal as a data layer within an existing benefits platform is the fastest path to scale. These platforms already have employer contracts.</div>
+                <span class="milestone-metric unmet">Partnership required</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">BAA (Business Associate Agreement) Executed</div>
+                <div class="milestone-desc">Required for any employer health data contract. Must be in place before a Fortune 500 HR team can legally engage.</div>
+                <span class="milestone-metric unmet">Legal action required</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- Data Licensing Tab -->
+      <div class="checklist-panel" id="data-tab">
+        <div class="checklist-card">
+          <div class="checklist-intro">
+            <strong>Target buyers:</strong> Pharma data brokers (IQVIA, Symphony Health), CROs, academic medical centers, digital health platforms building menopause features.<br>
+            <strong>What they buy:</strong> De-identified longitudinal PRO datasets, symptom phenotype libraries, signal algorithm licensing.
+          </div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-label"><span>Data Asset Maturity</span><span id="dataProgressPct">0%</span></div>
+            <div class="progress-bar-track"><div class="progress-bar-fill" id="dataProgressFill" style="width:0%"></div></div>
+          </div>
+          <div class="milestone-group">
+            <div class="milestone-group-title">Phase 1 — Asset Definition</div>
+            <div class="milestone-item">
+              <div class="milestone-status done">✓</div>
+              <div class="milestone-body">
+                <div class="milestone-title">Proprietary Signal Algorithm Defined</div>
+                <div class="milestone-desc">Stable/Monitor/Escalate classification is your core IP. It differentiates HerSignal from raw symptom survey data and commands a licensing premium.</div>
+                <span class="milestone-metric met">✓ Complete</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status done">✓</div>
+              <div class="milestone-body">
+                <div class="milestone-title">Longitudinal Data Collection Active</div>
+                <div class="milestone-desc">Weekly check-in cadence with timestamped records in Supabase. The infrastructure for a licensable dataset is live.</div>
+                <span class="milestone-metric met">✓ Complete</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status" id="ds3">?</div>
+              <div class="milestone-body">
+                <div class="milestone-title">50+ Records Accumulated</div>
+                <div class="milestone-desc">Minimum dataset size to demonstrate collection capability to a prospective data buyer.</div>
+                <span class="milestone-metric" id="ds3m">Checking…</span>
+              </div>
+            </div>
+          </div>
+          <div class="milestone-group">
+            <div class="milestone-group-title">Phase 2 — Licensing Readiness</div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">HIPAA Safe Harbor De-Identification</div>
+                <div class="milestone-desc">18 identifiers removed per HIPAA Safe Harbor standard. Required before any data can legally be sold or licensed. Estimated cost: $5,000–$15,000 with a privacy attorney.</div>
+                <span class="milestone-metric unmet">Legal action required</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">Data Dictionary + Codebook</div>
+                <div class="milestone-desc">A formal schema document describing every field, value range, and collection methodology. Required by every serious data buyer before due diligence.</div>
+                <span class="milestone-metric unmet">Document required</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">200+ Records · 100+ Unique Users</div>
+                <div class="milestone-desc">Minimum dataset for IQVIA / Symphony Health broker conversations. Below this threshold, licensing fees are negligible.</div>
+                <span class="milestone-metric unmet">Target: 200 records, 100 users</span>
+              </div>
+            </div>
+          </div>
+          <div class="milestone-group">
+            <div class="milestone-group-title">Phase 3 — Premium Asset</div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">OMOP CDM Conversion</div>
+                <div class="milestone-desc">Maps HerSignal data to the industry-standard Observational Medical Outcomes Partnership model. Unlocks TriNetX, PCORnet, and academic health system network participation.</div>
+                <span class="milestone-metric unmet">Unlocks at 200 users</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">1,000+ Records · 500+ Users</div>
+                <div class="milestone-desc">Premium licensing tier. At this scale, per-record value reaches $250–$500 for de-identified perimenopausal PRO data. Enables direct pharma licensing without a broker.</div>
+                <span class="milestone-metric unmet">Target: 1,000 records, 500 users</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- Clinical Tab -->
+      <div class="checklist-panel" id="clinical-tab">
+        <div class="checklist-card">
+          <div class="checklist-intro">
+            <strong>Target partners:</strong> Howard University Hospital, academic OB/GYN departments, menopause specialty clinics, NAMS (North American Menopause Society) member practices.<br>
+            <strong>What they need:</strong> Clinician-ready patient summaries, EHR integration pathway, IRB-compliant data sharing, and evidence that HerSignal improves clinical outcomes.
+          </div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-label"><span>Clinical Readiness</span><span id="clinicalProgressPct">0%</span></div>
+            <div class="progress-bar-track"><div class="progress-bar-fill" id="clinicalProgressFill" style="width:0%"></div></div>
+          </div>
+          <div class="milestone-group">
+            <div class="milestone-group-title">Phase 1 — Clinical Utility</div>
+            <div class="milestone-item">
+              <div class="milestone-status done">✓</div>
+              <div class="milestone-body">
+                <div class="milestone-title">Clinician-Ready Summary Export</div>
+                <div class="milestone-desc">Copy, email, and print sharing of check-in summaries is live. This is the core clinical utility feature that justifies provider adoption.</div>
+                <span class="milestone-metric met">✓ Complete</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status done">✓</div>
+              <div class="milestone-body">
+                <div class="milestone-title">Signal Algorithm (Triage Logic)</div>
+                <div class="milestone-desc">Stable/Monitor/Escalate classification gives clinicians an at-a-glance triage signal. This is the clinical decision support hook.</div>
+                <span class="milestone-metric met">✓ Complete</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status" id="cs3">?</div>
+              <div class="milestone-body">
+                <div class="milestone-title">5+ Active Users Sharing with Clinicians</div>
+                <div class="milestone-desc">Demonstrated clinical workflow integration. Required to show Howard University Hospital or any health system that real patients are using the sharing feature.</div>
+                <span class="milestone-metric" id="cs3m">Checking…</span>
+              </div>
+            </div>
+          </div>
+          <div class="milestone-group">
+            <div class="milestone-group-title">Phase 2 — Health System Pilot</div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">IRB Exemption or Approval</div>
+                <div class="milestone-desc">Required for any formal clinical study or health system pilot. Non-interventional observational studies often qualify for expedited review or exemption.</div>
+                <span class="milestone-metric unmet">Action required</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">Howard University Hospital MOU</div>
+                <div class="milestone-desc">Memorandum of Understanding for a shadow-mode pilot. 20–50 patients tracked alongside standard care. This is the clinical validation event that unlocks everything else.</div>
+                <span class="milestone-metric unmet">Outreach active</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">FHIR R4 Export Capability</div>
+                <div class="milestone-desc">Fast Healthcare Interoperability Resources standard. Required for EHR integration (Epic, Cerner). Enables HerSignal data to appear directly in the patient chart.</div>
+                <span class="milestone-metric unmet">Engineering required</span>
+              </div>
+            </div>
+          </div>
+          <div class="milestone-group">
+            <div class="milestone-group-title">Phase 3 — Clinical Evidence</div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">Peer-Reviewed Publication or Preprint</div>
+                <div class="milestone-desc">A single publication from the Howard pilot — even a conference abstract — transforms HerSignal from a wellness app to a clinical tool. Changes every conversation.</div>
+                <span class="milestone-metric unmet">Requires IRB + pilot data</span>
+              </div>
+            </div>
+            <div class="milestone-item">
+              <div class="milestone-status locked">🔒</div>
+              <div class="milestone-body">
+                <div class="milestone-title locked">NAMS Endorsement or Presentation</div>
+                <div class="milestone-desc">North American Menopause Society annual meeting presentation. The single highest-credibility signal for menopause-focused clinical and pharma buyers.</div>
+                <span class="milestone-metric unmet">Requires publication</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- Notes Table -->
+    <div class="panel-full">
+      <div class="panel-title">📝 Check-In Notes</div>
+      <div class="notes-table-wrap" id="notesWrap"></div>
+    </div>
+
+
+  </div><!-- /dashboard -->
+</main>
+
+
+<footer class="footer">
+  <div class="footer-row">
+    <a href="index.html">← Return to App</a>
+    <span>HerSignal Analytics · Not a diagnostic tool · ODHAi © 2026</span>
+  </div>
+</footer>
+
+
+<script>
+const SUPABASE_URL      = 'https://kwriboxxujqrypxopthl.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3cmlib3h4dWpxcnlweG9wdGhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5ODk2OTYsImV4cCI6MjA5NDU2NTY5Nn0.qoxQ9tPEoEnBPAT3M0ru3uxJDvTMcBnlP6lL9MYSDHw';
+const HIGH_RISK = new Set(['Hot Flashes','Night Sweats','Heart Palpitations','Heavy Bleeding']);
+const ALL_SYMPTOMS = ['Hot Flashes','Night Sweats','Brain Fog','Mood Shifts','Sleep Problems','Heart Palpitations','Heavy Bleeding','Fatigue','Joint Pain','Anxiety','Memory Changes','Weight Changes'];
+let chartDonut=null, chartLine=null, chartBar=null, ALL_RECORDS=[];
+
+
+function showState(name) {
+  ['Loading','Error','Empty'].forEach(s=>{ document.getElementById('state'+s).style.display=(s===name)?'flex':'none'; });
+  document.getElementById('dashboard').classList.toggle('visible',name==='Dashboard');
+  document.getElementById('totalBadge').style.display=(name==='Dashboard')?'flex':'none';
+}
+function setRefreshSpinner(on){ document.getElementById('btnRefresh').classList.toggle('spinning',on); }
+
+
+function switchTab(tabId, btn) {
+  document.querySelectorAll('.checklist-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.ctab').forEach(b=>b.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  btn.classList.add('active');
+}
+
+
+function populateUserFilter(records) {
+  const users=[...new Set(records.map(r=>r.user_id).filter(Boolean))];
+  const sel=document.getElementById('userFilter');
+  sel.innerHTML='<option value="all">All Users ('+records.length+' check-ins)</option>';
+  users.forEach((uid,i)=>{
+    const count=records.filter(r=>r.user_id===uid).length;
+    const opt=document.createElement('option');
+    opt.value=uid; opt.textContent='User '+(i+1)+' · '+count+' check-in'+(count!==1?'s':''); opt.title=uid;
+    sel.appendChild(opt);
+  });
+  document.getElementById('filterBar').style.display=users.length>=2?'flex':'none';
+}
+
+
+function applyFilter() {
+  const val=document.getElementById('userFilter').value;
+  const filtered=val==='all'?ALL_RECORDS:ALL_RECORDS.filter(r=>r.user_id===val);
+  document.getElementById('filterCount').textContent=val==='all'?'':filtered.length+' check-in'+(filtered.length!==1?'s':'')+' for this user';
+  renderDashboard(filtered);
+}
+
+
+async function loadData() {
+  showState('Loading'); setRefreshSpinner(true);
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),8000);
+  try {
+    const res=await fetch(SUPABASE_URL+'/rest/v1/checkins?order=checked_at.asc&limit=1000',{
+      signal:controller.signal,
+      headers:{'apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY}
+    });
+    clearTimeout(timeout);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    if(!Array.isArray(data)||data.length===0){showState('Empty');return;}
+    ALL_RECORDS=data;
+    populateUserFilter(data);
+    renderDashboard(data);
+    showState('Dashboard');
+  } catch(err) {
+    clearTimeout(timeout);
+    document.getElementById('errorMsg').textContent=err.name==='AbortError'?'Request timed out.':'Error: '+err.message;
+    showState('Error');
+  } finally { setRefreshSpinner(false); }
+}
+
+
+function renderDashboard(records) {
+  renderMetrics(records); renderDonut(records); renderLine(records);
+  renderBar(records); renderHistory(records);
+  renderIntelligence(records); renderChecklist(records);
+  renderNotes(records);
+  document.getElementById('totalBadgeCount').textContent=ALL_RECORDS.length.toLocaleString();
+}
+
+
+function renderMetrics(records) {
+  const avg=key=>{const v=records.map(r=>r[key]).filter(v=>v!=null&&!isNaN(v));return v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):'—';};
+  document.getElementById('mTotal').textContent=records.length.toLocaleString();
+  document.getElementById('mIntensity').textContent=avg('intensity')+'/5';
+  document.getElementById('mClarity').textContent=avg('clarity_score')+'/10';
+  document.getElementById('mStress').textContent=avg('stress_level')+'/5';
+}
+
+
+function renderDonut(records) {
+  const counts={stable:0,monitor:0,escalate:0};
+  records.forEach(r=>{const s=(r.signal||'').toLowerCase();if(s in counts)counts[s]++;});
+  const total=records.length;
+  document.getElementById('donutTotal').textContent=total;
+  const colors={stable:'#16a34a',monitor:'#d97706',escalate:'#dc2626'};
+  const labels={stable:'Stable',monitor:'Monitor',escalate:'Escalate'};
+  document.getElementById('donutLegend').innerHTML=Object.keys(counts).map(k=>{
+    const pct=total?((counts[k]/total)*100).toFixed(1):'0.0';
+    return `<div class="legend-item"><div class="legend-left"><div class="legend-dot" style="background:${colors[k]}"></div><span class="legend-name">${labels[k]}</span></div><div><span class="legend-pct">${pct}%</span><span class="legend-count">(${counts[k]})</span></div></div>`;
+  }).join('');
+  if(chartDonut)chartDonut.destroy();
+  chartDonut=new Chart(document.getElementById('chartDonut').getContext('2d'),{
+    type:'doughnut',
+    data:{labels:['Stable','Monitor','Escalate'],datasets:[{data:[counts.stable,counts.monitor,counts.escalate],backgroundColor:['#16a34a','#d97706','#dc2626'],borderColor:'#ffffff',borderWidth:3,hoverOffset:6}]},
+    options:{cutout:'68%',responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{const pct=total?((ctx.parsed/total)*100).toFixed(1):'0.0';return ` ${ctx.label}: ${ctx.parsed} (${pct}%)`;}}}}
+  }});
+}
+
+
+function renderLine(records) {
+  const weekMap={};
+  records.forEach(r=>{
+    const d=new Date(r.checked_at),week=getISOWeekLabel(d);
+    if(!weekMap[week])weekMap[week]={intensity:[],clarity:[],stress:[]};
+    if(r.intensity!=null)weekMap[week].intensity.push(r.intensity);
+    if(r.clarity_score!=null)weekMap[week].clarity.push(r.clarity_score);
+    if(r.stress_level!=null)weekMap[week].stress.push(r.stress_level);
+  });
+  const weeks=Object.keys(weekMap).sort();
+  const avg=arr=>arr.length?+(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(2):null;
+  if(chartLine)chartLine.destroy();
+  const ctx=document.getElementById('chartLine').getContext('2d');
+  const grad=ctx.createLinearGradient(0,0,0,240);
+  grad.addColorStop(0,'rgba(26,122,122,.25)');grad.addColorStop(1,'rgba(26,122,122,.01)');
+  chartLine=new Chart(ctx,{
+    type:'line',
+    data:{labels:weeks,datasets:[
+      {label:'Intensity',data:weeks.map(w=>avg(weekMap[w].intensity)),borderColor:'#1a7a7a',backgroundColor:grad,borderWidth:2.5,tension:.4,fill:true,pointRadius:4,pointBackgroundColor:'#1a7a7a',pointBorderColor:'#fff',pointBorderWidth:2},
+      {label:'Clarity',data:weeks.map(w=>avg(weekMap[w].clarity)),borderColor:'#6b2d99',backgroundColor:'transparent',borderWidth:2.5,tension:.4,fill:false,pointRadius:4,pointBackgroundColor:'#6b2d99',pointBorderColor:'#fff',pointBorderWidth:2},
+      {label:'Stress',data:weeks.map(w=>avg(weekMap[w].stress)),borderColor:'#d97706',backgroundColor:'transparent',borderWidth:2.5,tension:.4,fill:false,pointRadius:4,pointBackgroundColor:'#d97706',pointBorderColor:'#fff',pointBorderWidth:2}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      scales:{x:{grid:{color:'rgba(0,0,0,.04)'},ticks:{font:{size:11},color:'#9090a8',maxRotation:45}},y:{min:0,max:10,grid:{color:'rgba(0,0,0,.05)'},ticks:{font:{size:11},color:'#9090a8',stepSize:2}}},
+      plugins:{legend:{position:'top',align:'end',labels:{font:{size:11,weight:'600'},color:'#5a5a7a',boxWidth:12,boxHeight:12,padding:12,usePointStyle:true,pointStyle:'circle'}},
+      tooltip:{backgroundColor:'rgba(255,255,255,.97)',titleColor:'#1a1a2e',bodyColor:'#5a5a7a',borderColor:'#e8e4f0',borderWidth:1,padding:10,cornerRadius:8}}}
+  });
+}
+
+
+function renderBar(records) {
+  const freq={};ALL_SYMPTOMS.forEach(s=>freq[s]=0);
+  records.forEach(r=>{const syms=Array.isArray(r.symptoms)?r.symptoms:[];syms.forEach(s=>{const name=typeof s==='object'?s.name:s;if(name in freq)freq[name]++;});});
+  const sorted=ALL_SYMPTOMS.map(s=>({name:s,count:freq[s],highRisk:HIGH_RISK.has(s)})).sort((a,b)=>b.count-a.count);
+  document.getElementById('barWrap').style.height=(sorted.length*34+40)+'px';
+  if(chartBar)chartBar.destroy();
+  chartBar=new Chart(document.getElementById('chartBar').getContext('2d'),{
+    type:'bar',
+    data:{labels:sorted.map(s=>s.name),datasets:[{label:'Occurrences',data:sorted.map(s=>s.count),backgroundColor:sorted.map(s=>s.highRisk?'#dc2626':'#1a7a7a'),borderRadius:5,borderSkipped:false,barThickness:20}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      scales:{x:{beginAtZero:true,grid:{color:'rgba(0,0,0,.05)'},ticks:{font:{size:11},color:'#9090a8',precision:0}},y:{grid:{display:false},ticks:{font:{size:12},color:'#5a5a7a'}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.parsed.x} occurrence${ctx.parsed.x!==1?'s':''}`,title:ctx=>{const item=sorted[ctx[0].dataIndex];return item.name+(item.highRisk?' ⚠ High Risk':'');}},backgroundColor:'rgba(255,255,255,.97)',titleColor:'#1a1a2e',bodyColor:'#5a5a7a',borderColor:'#e8e4f0',borderWidth:1,padding:10,cornerRadius:8}}}
+  });
+}
+
+
+function renderHistory(records) {
+  const last20=records.slice(-20),track=document.getElementById('historyTrack');
+  track.innerHTML='';
+  last20.forEach(r=>{
+    const sig=(r.signal||'stable').toLowerCase(),d=new Date(r.checked_at);
+    const lbl=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    const item=document.createElement('div');item.className='history-item';
+    item.title=`${lbl} · ${sig.charAt(0).toUpperCase()+sig.slice(1)}`;
+    item.innerHTML=`<div class="history-dot ${sig}"></div><div class="history-date">${lbl}</div>`;
+    track.appendChild(item);
+  });
+}
+
+
+function avgField(records,key){const v=records.map(r=>r[key]).filter(v=>v!=null&&!isNaN(v));return v.length?+(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):0;}
+
+
+function renderIntelligence(records) {
+  const n=records.length;
+  const uniqueUsers=new Set(records.map(r=>r.user_id).filter(Boolean)).size;
+  const escalateCount=records.filter(r=>(r.signal||'').toLowerCase()==='escalate').length;
+  const escalatePct=n?(escalateCount/n*100):0;
+  const avgIntensity=avgField(records,'intensity');
+  const avgClarity=avgField(records,'clarity_score');
+  const avgStress=avgField(records,'stress_level');
+  const dates=records.map(r=>new Date(r.checked_at)).filter(d=>!isNaN(d));
+  const weekSpan=dates.length>=2?Math.round((Math.max(...dates)-Math.min(...dates))/(7*24*3600*1000)):0;
+  const symSet=new Set();
+  records.forEach(r=>{const syms=Array.isArray(r.symptoms)?r.symptoms:[];syms.forEach(s=>symSet.add(typeof s==='object'?s.name:s));});
+  const symDiversity=symSet.size;
+
+
+  // RWE Grade
+  let rweScore=0;
+  if(n>=500)rweScore+=4;else if(n>=100)rweScore+=3;else if(n>=50)rweScore+=2;else if(n>=10)rweScore+=1;
+  if(uniqueUsers>=200)rweScore+=3;else if(uniqueUsers>=50)rweScore+=2;else if(uniqueUsers>=10)rweScore+=1;
+  if(weekSpan>=52)rweScore+=3;else if(weekSpan>=12)rweScore+=2;else if(weekSpan>=4)rweScore+=1;
+  if(symDiversity>=8)rweScore+=2;else if(symDiversity>=4)rweScore+=1;
+  const rweGrade=rweScore>=10?'A':rweScore>=7?'B':rweScore>=4?'C':'D';
+  const rweLabels={A:'RWE-Ready',B:'Near Threshold',C:'Building Evidence',D:'Early Stage'};
+  document.getElementById('rweGrade').textContent=rweGrade;
+  document.getElementById('rweGradeLabel').textContent=rweLabels[rweGrade];
+  document.getElementById('rweRows').innerHTML=`
+    <div class="intel-row"><span class="intel-row-icon">👥</span><span><strong>${uniqueUsers}</strong> unique patient IDs${uniqueUsers<50?' — target 50+ for initial pharma conversations':' — sufficient for partner engagement'}</span></div>
+    <div class="intel-row"><span class="intel-row-icon">📅</span><span><strong>${weekSpan} weeks</strong> longitudinal depth${weekSpan<12?' — target 12+ weeks for trend validity':' — statistically valid trend window'}</span></div>
+    <div class="intel-row"><span class="intel-row-icon">🧬</span><span><strong>${symDiversity} symptoms</strong> tracked — ${symDiversity>=8?'strong':'growing'} phenotypic diversity</span></div>
+    <div class="intel-row"><span class="intel-row-icon">🚨</span><span><strong>${escalatePct.toFixed(1)}% escalate rate</strong> — ${escalatePct>20?'high clinical burden signal':'clinically meaningful signal'}</span></div>
+    <div class="intel-row"><span class="intel-row-icon">🔐</span><span>HIPAA Safe Harbor eligible · Supabase RLS compliant</span></div>`;
+  document.getElementById('rweTags').innerHTML=['FDA RWE Framework','HIPAA De-ID','Symptom Phenotyping','Perimenopausal Cohort','PRO Data','Longitudinal Signal'].map(t=>`<span class="intel-tag">${t}</span>`).join('');
+
+
+  // Benefits
+  const workforceRisk=avgIntensity>3.5||avgStress>3.5||escalatePct>25?'HIGH':avgIntensity>2.5||avgStress>2.5||escalatePct>15?'MODERATE':'LOW';
+  const presenteeismIndex=avgClarity?((10-avgClarity)/10*100).toFixed(0):'N/A';
+  document.getElementById('benefitsGrade').textContent=workforceRisk;
+  document.getElementById('benefitsGradeLabel').textContent='Workforce Risk Index';
+  document.getElementById('benefitsRows').innerHTML=`
+    <div class="intel-row"><span class="intel-row-icon">🧠</span><span><strong>Cognitive Presenteeism: ${presenteeismIndex}%</strong> — ${presenteeismIndex>40?'significant productivity drag':'within manageable range'}</span></div>
+    <div class="intel-row"><span class="intel-row-icon">📉</span><span><strong>Avg Clarity: ${avgClarity}/10</strong> — ${avgClarity<6?'below functional threshold':'within acceptable range'}</span></div>
+    <div class="intel-row"><span class="intel-row-icon">😰</span><span><strong>Avg Stress: ${avgStress}/5</strong> — ${avgStress>3?'elevated; absenteeism risk profile':'manageable stress burden'}</span></div>
+    <div class="intel-row"><span class="intel-row-icon">🏥</span><span><strong>${escalatePct.toFixed(1)}% escalate signals</strong> — ${escalatePct>15?'triggers EAP referral threshold':'below EAP escalation threshold'}</span></div>
+    <div class="intel-row"><span class="intel-row-icon">📋</span><span>Maps to SHRM Menopause Benefits Framework · EAP integration opportunity</span></div>`;
+  document.getElementById('benefitsTags').innerHTML=['Menopause Benefits','EAP Integration','CFO Business Case','SHRM Framework','Presenteeism Analytics','Absenteeism Risk'].map(t=>`<span class="intel-tag">${t}</span>`).join('');
+
+
+  // Data Asset
+  let dataScore=0;
+  if(n>=1000)dataScore+=4;else if(n>=200)dataScore+=3;else if(n>=50)dataScore+=2;else if(n>=10)dataScore+=1;
+  if(uniqueUsers>=500)dataScore+=3;else if(uniqueUsers>=100)dataScore+=2;else if(uniqueUsers>=20)dataScore+=1;
+  if(weekSpan>=104)dataScore+=3;else if(weekSpan>=52)dataScore+=2;else if(weekSpan>=12)dataScore+=1;
+  const dataGrade=dataScore>=9?'A+':dataScore>=7?'A':dataScore>=5?'B':dataScore>=3?'C':'D';
+  const dataLabels={'A+':'Premium Asset','A':'High Value','B':'Commercial Grade','C':'Pre-Commercial','D':'Seed Dataset'};
+  const recordValue=dataScore>=9?'$250–500':dataScore>=7?'$100–250':dataScore>=5?'$50–100':'$10–50';
+  document.getElementById('dataGrade').textContent=dataGrade;
+  document.getElementById('dataGradeLabel').textContent=dataLabels[dataGrade];
+  document.getElementById('dataRows').innerHTML=`
+    <div class="intel-row"><span class="intel-row-icon">💰</span><span><strong>Est. value: ${recordValue}/record</strong> — pharma licensing benchmark for de-identified PRO datasets</span></div>
+    <div class="intel-row"><span class="intel-row-icon">📊</span><span><strong>${n.toLocaleString()} records</strong> · <strong>${uniqueUsers} users</strong> · ${weekSpan} week span</span></div>
+    <div class="intel-row"><span class="intel-row-icon">🔑</span><span><strong>Proprietary signal algorithm</strong> is defensible IP vs. raw symptom surveys</span></div>
+    <div class="intel-row"><span class="intel-row-icon">🏗️</span><span>${n>=200?'OMOP CDM mapping feasible — opens CRO channels':'Scale to 200+ records before OMOP conversion'}</span></div>
+    <div class="intel-row"><span class="intel-row-icon">🤝</span><span>${n>=100?'Ready for Astellas, Bayer, Organon conversations':'Build to 100 records for first pharma conversation'}</span></div>`;
+  document.getElementById('dataTags').innerHTML=['Proprietary PRO Dataset','OMOP CDM','FHIR Compatible','Pharma Licensing','IRB-Exempt Pathway','Signal IP'].map(t=>`<span class="intel-tag">${t}</span>`).join('');
+
+
+  // Executive Summary
+  const readiness=rweGrade==='A'?'RWE-ready and commercially mature':rweGrade==='B'?'approaching commercial-grade RWE thresholds':'in active development toward RWE thresholds';
+  document.getElementById('execText').innerHTML=`HerSignal has <strong>${n.toLocaleString()}</strong> longitudinal check-ins across <strong>${uniqueUsers}</strong> unique users, spanning <strong>${weekSpan} weeks</strong>. The dataset is ${readiness}. Workforce health signal indicates <strong>${workforceRisk.toLowerCase()} risk</strong> with a ${presenteeismIndex}% cognitive presenteeism index and ${escalatePct.toFixed(1)}% escalation rate — directly relevant to employer benefit plan design. The proprietary signal algorithm constitutes defensible IP with an estimated licensing value of <strong>${recordValue}/record</strong>. ${n>=100?'Cohort is sufficient to initiate pharma partnership conversations.':'Scaling to 100+ users activates the full commercial opportunity.'}`;
+  document.getElementById('execBadges').innerHTML=[rweGrade==='A'?'✅ RWE-Ready':'📈 RWE: '+rweGrade+' Grade','Workforce: '+workforceRisk+' Risk','Data: '+recordValue+'/record',uniqueUsers+' Unique Users',weekSpan+'wk Dataset','Signal IP: Proprietary'].map(b=>`<span class="exec-badge">${b}</span>`).join('');
+}
+
+
+function setMilestone(id, status, metricId, metricText, metricMet) {
+  const el=document.getElementById(id);
+  if(!el)return;
+  if(status==='done'){el.className='milestone-status done';el.textContent='✓';}
+  else if(status==='active'){el.className='milestone-status active';el.textContent='→';}
+  else{el.className='milestone-status locked';el.textContent='🔒';}
+  if(metricId){
+    const m=document.getElementById(metricId);
+    if(m){m.textContent=metricText;m.className='milestone-metric '+(metricMet?'met':'unmet');}
+  }
+}
+
+
+function setProgress(fillId, pctId, pct) {
+  const fill=document.getElementById(fillId),label=document.getElementById(pctId);
+  if(fill)fill.style.width=pct+'%';
+  if(label)label.textContent=Math.round(pct)+'%';
+}
+
+
+function renderChecklist(records) {
+  const n=records.length;
+  const uniqueUsers=new Set(records.map(r=>r.user_id).filter(Boolean)).size;
+  const escalateCount=records.filter(r=>(r.signal||'').toLowerCase()==='escalate').length;
+  const dates=records.map(r=>new Date(r.checked_at)).filter(d=>!isNaN(d));
+  const weekSpan=dates.length>=2?Math.round((Math.max(...dates)-Math.min(...dates))/(7*24*3600*1000)):0;
+  const symSet=new Set();
+  records.forEach(r=>{const syms=Array.isArray(r.symptoms)?r.symptoms:[];syms.forEach(s=>symSet.add(typeof s==='object'?s.name:s));});
+
+
+  // Pharma checklist
+  const p1=uniqueUsers>=10,p2=weekSpan>=4,p3=symSet.size>=6;
+  setMilestone('ps1',p1?'done':'active','ps1m',p1?`✓ ${uniqueUsers} users`:`${uniqueUsers}/10 users`,p1);
+  setMilestone('ps2',p2?'done':'active','ps2m',p2?`✓ ${weekSpan} weeks`:`${weekSpan}/4 weeks`,p2);
+  setMilestone('ps3',p3?'done':'active','ps3m',p3?`✓ ${symSet.size} symptoms`:`${symSet.size}/6 symptoms`,p3);
+  setMilestone('ps4',uniqueUsers>=50?'done':'locked','ps4m',`${uniqueUsers}/50 users`,uniqueUsers>=50);
+  const pharmaDone=[p1,p2,p3,uniqueUsers>=50,weekSpan>=12,false,false,false,false].filter(Boolean).length;
+  setProgress('pharmaProgressFill','pharmaProgressPct',Math.round(pharmaDone/9*100));
+  const pharmaBanner=document.getElementById('pharmaBanner');
+  if(pharmaBanner){
+    const next=!p1?`Recruit ${10-uniqueUsers} more users to unlock Phase 1`:!p2?`${4-weekSpan} more weeks of data needed`:!p3?`Track ${6-symSet.size} more symptom types`:uniqueUsers<50?`Recruit ${50-uniqueUsers} more users to unlock pharma conversations`:'Phase 1 complete — begin HIPAA de-identification';
+    pharmaBanner.innerHTML=`<div class="unlock-banner">⚡ Next milestone: ${next}</div>`;
+  }
+
+
+  // Benefits checklist
+  const b1=n>=20,b2=escalateCount>0;
+  setMilestone('bs1',b1?'done':'active','bs1m',b1?`✓ ${n} check-ins`:`${n}/20 check-ins`,b1);
+  setMilestone('bs2',b2?'done':'active','bs2m',b2?`✓ ${escalateCount} escalate signal${escalateCount!==1?'s':''}`:'No escalate signals yet',b2);
+  const benefitsDone=[b1,b2,false,false,false,false,false].filter(Boolean).length;
+  setProgress('benefitsProgressFill','benefitsProgressPct',Math.round(benefitsDone/7*100));
+
+
+  // Data licensing checklist
+  const d3=n>=50;
+  setMilestone('ds3',d3?'done':'active','ds3m',d3?`✓ ${n} records`:`${n}/50 records`,d3);
+  const dataDone=[true,true,d3,false,false,false,false].filter(Boolean).length;
+  setProgress('dataProgressFill','dataProgressPct',Math.round(dataDone/7*100));
+
+
+  // Clinical checklist
+  const c3=uniqueUsers>=5;
+  setMilestone('cs3',c3?'done':'active','cs3m',c3?`✓ ${uniqueUsers} users active`:`${uniqueUsers}/5 users needed`,c3);
+  const clinicalDone=[true,true,c3,false,false,false,false,false].filter(Boolean).length;
+  setProgress('clinicalProgressFill','clinicalProgressPct',Math.round(clinicalDone/8*100));
+}
+
+
+function renderNotes(records) {
+  const withNotes=records.filter(r=>r.notes&&r.notes.trim()).slice().reverse();
+  const wrap=document.getElementById('notesWrap');
+  if(!withNotes.length){wrap.innerHTML='<div class="no-notes">No notes recorded yet.</div>';return;}
+  const rows=withNotes.map(r=>{
+    const sig=(r.signal||'stable').toLowerCase(),d=new Date(r.checked_at);
+    const dateStr=d.toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'});
+    const timeStr=d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+    return `<tr><td class="td-date">${dateStr}<br><span style="color:var(--text-muted);font-size:.72rem;">${timeStr}</span></td><td><span class="signal-badge ${sig}">${sig}</span></td><td class="td-notes">${escapeHtml(r.notes.trim())}</td></tr>`;
+  }).join('');
+  wrap.innerHTML=`<table><thead><tr><th>Date</th><th>Signal</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+
+function getISOWeekLabel(date){const d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));const day=d.getUTCDay()||7;d.setUTCDate(d.getUTCDate()+4-day);const ys=new Date(Date.UTC(d.getUTCFullYear(),0,1));const week=Math.ceil((((d-ys)/86400000)+1)/7);return `W${String(week).padStart(2,'0')} '${String(d.getUTCFullYear()).slice(2)}`;}
+function escapeHtml(str){return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+
+
+loadData();
+</script>
+</body>
+</html>
